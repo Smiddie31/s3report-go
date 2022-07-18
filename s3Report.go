@@ -17,22 +17,14 @@ type s3Bucket struct {
 	logging    bool
 }
 
-func ListBuckets(client *s3.Client) (*s3.ListBucketsOutput, error) {
-	res, err := client.ListBuckets(context.TODO(), nil)
-	if err != nil {
-		return nil, err
-	}
-	return res, nil
-}
-
 func main() {
 	var bucketData []*s3Bucket
 	cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion("us-east-1"))
 	if err != nil {
 		log.Fatalf("failed to load configuration, %v", err)
 	}
-	s3client := s3.NewFromConfig(cfg)
-	buckets, awserr := ListBuckets(s3client)
+	s3Client := s3.NewFromConfig(cfg)
+	buckets, awserr := s3Client.ListBuckets(context.TODO(), nil)
 	if awserr != nil {
 		fmt.Printf("Couldn't list buckets: %v", err)
 		return
