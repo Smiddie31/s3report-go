@@ -3,10 +3,11 @@ package main
 import (
 	"context"
 	"encoding/csv"
-	"fmt"
 	"log"
 	"os"
 	"strconv"
+
+	"github.com/aws/aws-sdk-go-v2/aws"
 
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -14,12 +15,16 @@ import (
 
 type s3Bucket struct {
 	name       string
+	region     string
 	versioning string
 	logging    bool
 }
 
-func getVersioning(n string, c *s3.Client) (v string) {
-	ver, err := c.GetBucketVersioning(context.TODO(), &s3.GetBucketVersioningInput{Bucket: &n})
+func getVersioning(n string, c aws.Config, r string) (v string) {
+	s3Client := s3.NewFromConfig(c, func(o *s3.Options) {
+		o.Region = r
+	})
+	ver, err := s3Client.GetBucketVersioning(context.TODO(), &s3.GetBucketVersioningInput{Bucket: &n})
 	if err != nil {
 		log.Fatalf("failed to get bucket versioning status, %v", err)
 	}
@@ -35,20 +40,28 @@ func getVersioning(n string, c *s3.Client) (v string) {
 
 func main() {
 	var bucketData []*s3Bucket
-	cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion("ap-southeast-2"))
+	cfg, err := config.LoadDefaultConfig(context.TODO())
 	if err != nil {
 		log.Fatalf("failed to load configuration, %v", err)
 	}
-	s3Client := s3.NewFromConfig(cfg)
+	s3Client := s3.NewFromConfig(cfg, func(o *s3.Options) {})
 	buckets, awserr := s3Client.ListBuckets(context.TODO(), nil)
 	if awserr != nil {
-		fmt.Printf("Couldn't list buckets: %v", err)
+		log.Fatalf("Couldn't list buckets: %v", err)
 		return
 	}
 
 	for _, bucket := range buckets.Buckets {
-		vStatus := getVersioning(*bucket.Name, s3Client)
-		bucketData = append(bucketData, &s3Bucket{*bucket.Name, vStatus, false})
+		bL, blerr := s3Client.GetBucketLocation(context.TODO(), &s3.GetBucketLocationInput{Bucket: bucket.Name})
+		if blerr != nil {
+			log.Fatalf("Couldn't locate bucket: %v", blerr)
+		}
+		bLocation := string(bL.LocationConstraint)
+		if bLocation == "" {
+			bLocation = "us-east-1"
+		}
+		vStatus := getVersioning(*bucket.Name, cfg, bLocation)
+		bucketData = append(bucketData, &s3Bucket{*bucket.Name, bLocation, vStatus, false})
 	}
 	file, err := os.Create("bucketdata.csv")
 	defer func(file *os.File) {
@@ -64,9 +77,9 @@ func main() {
 	defer w.Flush()
 	// Using WriteAll
 	var data [][]string
-	data = append(data, []string{"Name", "Versioning", "Logging"})
+	data = append(data, []string{"Name", "Region", "Versioning", "Logging"})
 	for _, record := range bucketData {
-		row := []string{record.name, record.versioning, strconv.FormatBool(record.logging)}
+		row := []string{record.name, record.region, record.versioning, strconv.FormatBool(record.logging)}
 		data = append(data, row)
 	}
 	errData := w.WriteAll(data)
