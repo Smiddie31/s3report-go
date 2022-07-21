@@ -3,10 +3,11 @@ package main
 import (
 	"context"
 	"encoding/csv"
-	"github.com/aws/aws-sdk-go-v2/aws"
 	"log"
 	"os"
 	"strconv"
+
+	"github.com/aws/aws-sdk-go-v2/aws"
 
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -17,64 +18,6 @@ type s3Bucket struct {
 	region     string
 	versioning string
 	logging    bool
-}
-
-func getRegion(b *s3.GetBucketLocationOutput) (s string) {
-	switch b.LocationConstraint {
-	case "af-south-1":
-		s = "af-south-1"
-	case "ap-east-1":
-		s = "ap-east-1"
-	case "ap-northeast-1":
-		s = "ap-northeast-1"
-	case "ap-northeast-2":
-		s = "ap-northeast-2"
-	case "ap-northeast-3":
-		s = "ap-northeast-3"
-	case "ap-south-1":
-		s = "ap-south-1"
-	case "ap-southeast-1":
-		s = "ap-southeast-1"
-	case "ap-southeast-2":
-		s = "ap-southeast-2"
-	case "ca-central-1":
-		s = "ca-central-1"
-	case "cn-north-1":
-		s = "cn-north-1"
-	case "cn-northwest-1":
-		s = "cn-northwest-1"
-	case "EU":
-		s = "EU"
-	case "eu-central-1":
-		s = "eu-central-1"
-	case "eu-north-1":
-		s = "eu-north-1"
-	case "eu-south-1":
-		s = "eu-south-1"
-	case "eu-west-1":
-		s = "eu-west-1"
-	case "eu-west-2":
-		s = "eu-west-2"
-	case "eu-west-3":
-		s = "eu-west-3"
-	case "me-south-1":
-		s = "me-south-1"
-	case "sa-east-1":
-		s = "sa-east-1"
-	case "us-east-2":
-		s = "us-east-2"
-	case "us-gov-east-1":
-		s = "us-gov-east-1"
-	case "us-gov-west-1":
-		s = "us-gov-west-1"
-	case "us-west-1":
-		s = "us-west-1"
-	case "us-west-2":
-		s = "us-west-2"
-	case "":
-		s = "us-east-1"
-	}
-	return s
 }
 
 func getVersioning(n string, c aws.Config, r string) (v string) {
@@ -113,7 +56,10 @@ func main() {
 		if blerr != nil {
 			log.Fatalf("Couldn't locate bucket: %v", blerr)
 		}
-		bLocation := getRegion(bL)
+		bLocation := string(bL.LocationConstraint)
+		if bLocation == "" {
+			bLocation = "us-east-1"
+		}
 		vStatus := getVersioning(*bucket.Name, cfg, bLocation)
 		bucketData = append(bucketData, &s3Bucket{*bucket.Name, bLocation, vStatus, false})
 	}
