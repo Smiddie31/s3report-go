@@ -65,16 +65,16 @@ func main() {
 		log.Fatalf("failed to load configuration, %v", err)
 	}
 	s3Client := s3.NewFromConfig(cfg, func(o *s3.Options) {})
-	buckets, awserr := s3Client.ListBuckets(context.TODO(), nil)
-	if awserr != nil {
+	buckets, awsErr := s3Client.ListBuckets(context.TODO(), nil)
+	if awsErr != nil {
 		log.Fatalf("Couldn't list buckets: %v", err)
 		return
 	}
 
 	for _, bucket := range buckets.Buckets {
-		bL, blerr := s3Client.GetBucketLocation(context.TODO(), &s3.GetBucketLocationInput{Bucket: bucket.Name})
-		if blerr != nil {
-			log.Fatalf("Couldn't locate bucket: %v", blerr)
+		bL, blErr := s3Client.GetBucketLocation(context.TODO(), &s3.GetBucketLocationInput{Bucket: bucket.Name})
+		if blErr != nil {
+			log.Fatalf("Couldn't locate bucket: %v", blErr)
 		}
 		bLocation := string(bL.LocationConstraint)
 		if bLocation == "" {
@@ -84,7 +84,7 @@ func main() {
 		eStatus, eType := getEncryption(*bucket.Name, cfg, bLocation)
 		bucketData = append(bucketData, &s3Bucket{*bucket.Name, bLocation, vStatus, false, eStatus, eType})
 	}
-	file, err := os.Create("bucketdata.csv")
+	file, err := os.Create("bucket-data.csv")
 	defer func(file *os.File) {
 		err := file.Close()
 		if err != nil {
