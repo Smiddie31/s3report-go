@@ -18,6 +18,8 @@ type s3Bucket struct {
 	region     string
 	versioning string
 	logging    bool
+	encStatus  string
+	encType    string
 }
 
 func getVersioning(n string, c aws.Config, r string) (v string) {
@@ -35,6 +37,24 @@ func getVersioning(n string, c aws.Config, r string) (v string) {
 		return "Suspended"
 	default:
 		return "Not Enabled"
+	}
+}
+
+func getEncryption(n string, c aws.Config, r string) (v string, t string) {
+	s3Client := s3.NewFromConfig(c, func(o *s3.Options) {
+		o.Region = r
+	})
+	resp, err := s3Client.GetBucketEncryption(context.TODO(), &s3.GetBucketEncryptionInput{Bucket: &n})
+	if err != nil {
+		return "Not Enabled", "None"
+	}
+	switch resp.ServerSideEncryptionConfiguration.Rules[0].ApplyServerSideEncryptionByDefault.SSEAlgorithm {
+	case "AES256":
+		return "Enabled", "SSE"
+	case "aws:kms":
+		return "Enabled", "KMS"
+	default:
+		return "Not Enabled", "None"
 	}
 }
 
@@ -61,7 +81,8 @@ func main() {
 			bLocation = "us-east-1"
 		}
 		vStatus := getVersioning(*bucket.Name, cfg, bLocation)
-		bucketData = append(bucketData, &s3Bucket{*bucket.Name, bLocation, vStatus, false})
+		eStatus, eType := getEncryption(*bucket.Name, cfg, bLocation)
+		bucketData = append(bucketData, &s3Bucket{*bucket.Name, bLocation, vStatus, false, eStatus, eType})
 	}
 	file, err := os.Create("bucketdata.csv")
 	defer func(file *os.File) {
@@ -77,9 +98,9 @@ func main() {
 	defer w.Flush()
 	// Using WriteAll
 	var data [][]string
-	data = append(data, []string{"Name", "Region", "Versioning", "Logging"})
+	data = append(data, []string{"Name", "Region", "Versioning", "Logging", "Encryption Status", "Encryption Type"})
 	for _, record := range bucketData {
-		row := []string{record.name, record.region, record.versioning, strconv.FormatBool(record.logging)}
+		row := []string{record.name, record.region, record.versioning, strconv.FormatBool(record.logging), record.encStatus, record.encType}
 		data = append(data, row)
 	}
 	errData := w.WriteAll(data)
