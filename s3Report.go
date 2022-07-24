@@ -6,6 +6,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"log"
 	"os"
+	"strconv"
 
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -19,6 +20,7 @@ type s3Bucket struct {
 	encType    string
 	logStatus  string
 	logBucket  string
+	polStatus  bool
 }
 
 func getVersioning(n string, c aws.Config, r string) (v string) {
@@ -63,13 +65,24 @@ func getLogging(n string, c aws.Config, r string) (l string, b string) {
 	})
 	resp, err := s3Client.GetBucketLogging(context.TODO(), &s3.GetBucketLoggingInput{Bucket: &n})
 	if err != nil {
-		return "Not Enabled", "None"
+		log.Fatalf("failed to get bucket logging status, %v", err)
 	}
 	if resp.LoggingEnabled != nil {
 		return "Enabled", *resp.LoggingEnabled.TargetBucket
 	} else {
 		return "Not Enabled", "None"
 	}
+}
+
+func isPublic(n string, c aws.Config, r string) (p bool) {
+	s3Client := s3.NewFromConfig(c, func(o *s3.Options) {
+		o.Region = r
+	})
+	resp, err := s3Client.GetBucketPolicyStatus(context.TODO(), &s3.GetBucketPolicyStatusInput{Bucket: &n})
+	if err != nil {
+		return false
+	}
+	return resp.PolicyStatus.IsPublic
 }
 
 func main() {
@@ -97,7 +110,8 @@ func main() {
 		vStatus := getVersioning(*bucket.Name, cfg, bLocation)
 		eStatus, eType := getEncryption(*bucket.Name, cfg, bLocation)
 		lStatus, lBucket := getLogging(*bucket.Name, cfg, bLocation)
-		bucketData = append(bucketData, &s3Bucket{*bucket.Name, bLocation, vStatus, eStatus, eType, lStatus, lBucket})
+		pStatus := isPublic(*bucket.Name, cfg, bLocation)
+		bucketData = append(bucketData, &s3Bucket{*bucket.Name, bLocation, vStatus, eStatus, eType, lStatus, lBucket, pStatus})
 	}
 	file, err := os.Create("bucket-data.csv")
 	defer func(file *os.File) {
@@ -113,9 +127,9 @@ func main() {
 	defer w.Flush()
 	// Using WriteAll
 	var data [][]string
-	data = append(data, []string{"Name", "Region", "Versioning", "Encryption Status", "Encryption Type", "Logging", "Logging Bucket"})
+	data = append(data, []string{"Name", "Region", "Versioning", "Encryption Status", "Encryption Type", "Logging", "Logging Bucket", "Public"})
 	for _, record := range bucketData {
-		row := []string{record.name, record.region, record.versioning, record.encStatus, record.encType, record.logStatus, record.logBucket}
+		row := []string{record.name, record.region, record.versioning, record.encStatus, record.encType, record.logStatus, record.logBucket, strconv.FormatBool(record.polStatus)}
 		data = append(data, row)
 	}
 	errData := w.WriteAll(data)
