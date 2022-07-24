@@ -3,11 +3,10 @@ package main
 import (
 	"context"
 	"encoding/csv"
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"log"
 	"os"
 	"strconv"
-
-	"github.com/aws/aws-sdk-go-v2/aws"
 
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -17,7 +16,11 @@ type s3Bucket struct {
 	name       string
 	region     string
 	versioning string
-	logging    bool
+	encStatus  string
+	encType    string
+	logStatus  string
+	logBucket  string
+	polStatus  bool
 }
 
 func getVersioning(n string, c aws.Config, r string) (v string) {
@@ -38,6 +41,50 @@ func getVersioning(n string, c aws.Config, r string) (v string) {
 	}
 }
 
+func getEncryption(n string, c aws.Config, r string) (v string, t string) {
+	s3Client := s3.NewFromConfig(c, func(o *s3.Options) {
+		o.Region = r
+	})
+	resp, err := s3Client.GetBucketEncryption(context.TODO(), &s3.GetBucketEncryptionInput{Bucket: &n})
+	if err != nil {
+		return "Not Enabled", "None"
+	}
+	switch resp.ServerSideEncryptionConfiguration.Rules[0].ApplyServerSideEncryptionByDefault.SSEAlgorithm {
+	case "AES256":
+		return "Enabled", "SSE"
+	case "aws:kms":
+		return "Enabled", "KMS"
+	default:
+		return "Not Enabled", "None"
+	}
+}
+
+func getLogging(n string, c aws.Config, r string) (l string, b string) {
+	s3Client := s3.NewFromConfig(c, func(o *s3.Options) {
+		o.Region = r
+	})
+	resp, err := s3Client.GetBucketLogging(context.TODO(), &s3.GetBucketLoggingInput{Bucket: &n})
+	if err != nil {
+		log.Fatalf("failed to get bucket logging status, %v", err)
+	}
+	if resp.LoggingEnabled != nil {
+		return "Enabled", *resp.LoggingEnabled.TargetBucket
+	} else {
+		return "Not Enabled", "None"
+	}
+}
+
+func isPublic(n string, c aws.Config, r string) (p bool) {
+	s3Client := s3.NewFromConfig(c, func(o *s3.Options) {
+		o.Region = r
+	})
+	resp, err := s3Client.GetBucketPolicyStatus(context.TODO(), &s3.GetBucketPolicyStatusInput{Bucket: &n})
+	if err != nil {
+		return false
+	}
+	return resp.PolicyStatus.IsPublic
+}
+
 func main() {
 	var bucketData []*s3Bucket
 	cfg, err := config.LoadDefaultConfig(context.TODO())
@@ -45,25 +92,28 @@ func main() {
 		log.Fatalf("failed to load configuration, %v", err)
 	}
 	s3Client := s3.NewFromConfig(cfg, func(o *s3.Options) {})
-	buckets, awserr := s3Client.ListBuckets(context.TODO(), nil)
-	if awserr != nil {
+	buckets, awsErr := s3Client.ListBuckets(context.TODO(), nil)
+	if awsErr != nil {
 		log.Fatalf("Couldn't list buckets: %v", err)
 		return
 	}
 
 	for _, bucket := range buckets.Buckets {
-		bL, blerr := s3Client.GetBucketLocation(context.TODO(), &s3.GetBucketLocationInput{Bucket: bucket.Name})
-		if blerr != nil {
-			log.Fatalf("Couldn't locate bucket: %v", blerr)
+		bL, blErr := s3Client.GetBucketLocation(context.TODO(), &s3.GetBucketLocationInput{Bucket: bucket.Name})
+		if blErr != nil {
+			log.Fatalf("Couldn't locate bucket: %v", blErr)
 		}
 		bLocation := string(bL.LocationConstraint)
 		if bLocation == "" {
 			bLocation = "us-east-1"
 		}
 		vStatus := getVersioning(*bucket.Name, cfg, bLocation)
-		bucketData = append(bucketData, &s3Bucket{*bucket.Name, bLocation, vStatus, false})
+		eStatus, eType := getEncryption(*bucket.Name, cfg, bLocation)
+		lStatus, lBucket := getLogging(*bucket.Name, cfg, bLocation)
+		pStatus := isPublic(*bucket.Name, cfg, bLocation)
+		bucketData = append(bucketData, &s3Bucket{*bucket.Name, bLocation, vStatus, eStatus, eType, lStatus, lBucket, pStatus})
 	}
-	file, err := os.Create("bucketdata.csv")
+	file, err := os.Create("bucket-data.csv")
 	defer func(file *os.File) {
 		err := file.Close()
 		if err != nil {
@@ -77,9 +127,9 @@ func main() {
 	defer w.Flush()
 	// Using WriteAll
 	var data [][]string
-	data = append(data, []string{"Name", "Region", "Versioning", "Logging"})
+	data = append(data, []string{"Name", "Region", "Versioning", "Encryption Status", "Encryption Type", "Logging", "Logging Bucket", "Public"})
 	for _, record := range bucketData {
-		row := []string{record.name, record.region, record.versioning, strconv.FormatBool(record.logging)}
+		row := []string{record.name, record.region, record.versioning, record.encStatus, record.encType, record.logStatus, record.logBucket, strconv.FormatBool(record.polStatus)}
 		data = append(data, row)
 	}
 	errData := w.WriteAll(data)
