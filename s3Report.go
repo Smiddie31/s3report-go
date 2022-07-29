@@ -1,13 +1,31 @@
+/*
+s3report-go is a s3 bucket report generator.
+It uses default AWS credentials to authenticate with AWS API's and establish a client.
+Once the script authenticates it lists all buckets, and gathers information about each bucket.
+
+
+Usage:
+
+    s3report-go [flags] [path ...]
+
+The flags are:
+
+    -f
+        The filename of the generated csv file.
+
+*/
 package main
 
 import (
 	"context"
 	"encoding/csv"
-	"github.com/aws/aws-sdk-go-v2/aws"
+	"flag"
+	"fmt"
 	"log"
 	"os"
 	"strconv"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 )
@@ -23,6 +41,7 @@ type s3Bucket struct {
 	polStatus  bool
 }
 
+// Query the s3 bucket and returns the s3 versioning status.
 func getVersioning(n string, c aws.Config, r string) (v string) {
 	s3Client := s3.NewFromConfig(c, func(o *s3.Options) {
 		o.Region = r
@@ -41,6 +60,7 @@ func getVersioning(n string, c aws.Config, r string) (v string) {
 	}
 }
 
+// Query the s3 bucket and returns the s3 encryption status and type.
 func getEncryption(n string, c aws.Config, r string) (v string, t string) {
 	s3Client := s3.NewFromConfig(c, func(o *s3.Options) {
 		o.Region = r
@@ -59,6 +79,7 @@ func getEncryption(n string, c aws.Config, r string) (v string, t string) {
 	}
 }
 
+// Query the s3 bucket and returns the s3 logging status and logging bucket(if applicable).
 func getLogging(n string, c aws.Config, r string) (l string, b string) {
 	s3Client := s3.NewFromConfig(c, func(o *s3.Options) {
 		o.Region = r
@@ -74,6 +95,7 @@ func getLogging(n string, c aws.Config, r string) (l string, b string) {
 	}
 }
 
+// Query the s3 bucket and returns whether the bucket is public facing or not.
 func isPublic(n string, c aws.Config, r string) (p bool) {
 	s3Client := s3.NewFromConfig(c, func(o *s3.Options) {
 		o.Region = r
@@ -86,6 +108,9 @@ func isPublic(n string, c aws.Config, r string) (p bool) {
 }
 
 func main() {
+	var fName string
+	flag.StringVar(&fName, "f", "bucket-data", "Specify filename. Default is 'bucket-data'")
+	flag.Parse()
 	var bucketData []*s3Bucket
 	cfg, err := config.LoadDefaultConfig(context.TODO())
 	if err != nil {
@@ -113,11 +138,13 @@ func main() {
 		pStatus := isPublic(*bucket.Name, cfg, bLocation)
 		bucketData = append(bucketData, &s3Bucket{*bucket.Name, bLocation, vStatus, eStatus, eType, lStatus, lBucket, pStatus})
 	}
-	file, err := os.Create("bucket-data.csv")
+	s := fmt.Sprintf("%v.csv", fName)
+
+	file, err := os.Create(s)
 	defer func(file *os.File) {
 		err := file.Close()
 		if err != nil {
-
+			log.Fatalln("failed to close file", err)
 		}
 	}(file)
 	if err != nil {
@@ -125,7 +152,6 @@ func main() {
 	}
 	w := csv.NewWriter(file)
 	defer w.Flush()
-	// Using WriteAll
 	var data [][]string
 	data = append(data, []string{"Name", "Region", "Versioning", "Encryption Status", "Encryption Type", "Logging", "Logging Bucket", "Public"})
 	for _, record := range bucketData {

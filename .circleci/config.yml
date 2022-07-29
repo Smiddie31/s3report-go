@@ -24,7 +24,7 @@ jobs: # basic units of work in a run
       - run:
           name: Run Script
           command: |
-            go run s3Report.go
+            go run s3Report.go -f s3Report
             cp bucket-data.csv /tmp/test-results
             
       - store_artifacts: # upload test summary for display in Artifacts
