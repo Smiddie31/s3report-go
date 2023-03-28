@@ -88,25 +88,6 @@ func GetBucketEncryption(ctx context.Context, client BucketEncryption, bucketNam
 
 }
 
-// Query the s3 bucket and returns the s3 encryption status and type.
-func getEncryption(n string, c aws.Config, r string) (v string, t string) {
-	s3Client := s3.NewFromConfig(c, func(o *s3.Options) {
-		o.Region = r
-	})
-	resp, err := s3Client.GetBucketEncryption(context.TODO(), &s3.GetBucketEncryptionInput{Bucket: &n})
-	if err != nil {
-		return "Not Enabled", "None"
-	}
-	switch resp.ServerSideEncryptionConfiguration.Rules[0].ApplyServerSideEncryptionByDefault.SSEAlgorithm {
-	case "AES256":
-		return "Enabled", "SSE"
-	case "aws:kms":
-		return "Enabled", "KMS"
-	default:
-		return "Not Enabled", "None"
-	}
-}
-
 // Query the s3 bucket and returns the s3 logging status and logging bucket(if applicable).
 func getLogging(n string, c aws.Config, r string) (l string, b string) {
 	s3Client := s3.NewFromConfig(c, func(o *s3.Options) {
