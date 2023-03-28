@@ -3,16 +3,14 @@ s3report-go is a s3 bucket report generator.
 It uses default AWS credentials to authenticate with AWS API's and establish a client.
 Once the script authenticates it lists all buckets, and gathers information about each bucket.
 
-
 Usage:
 
-    s3report-go [flags] [path ...]
+	s3report-go [flags] [path ...]
 
 The flags are:
 
-    -f
-        The filename of the generated csv file.
-
+	-f
+	    The filename of the generated csv file.
 */
 package main
 
@@ -41,12 +39,15 @@ type s3Bucket struct {
 	polStatus  bool
 }
 
-// Query the s3 bucket and returns the s3 versioning status.
-func getVersioning(n string, c aws.Config, r string) (v string) {
-	s3Client := s3.NewFromConfig(c, func(o *s3.Options) {
-		o.Region = r
-	})
-	ver, err := s3Client.GetBucketVersioning(context.TODO(), &s3.GetBucketVersioningInput{Bucket: &n})
+type BucketVersioning interface {
+	GetBucketVersioning(ctx context.Context, input *s3.GetBucketVersioningInput, optFns ...func(*s3.Options)) (*s3.GetBucketVersioningOutput, error)
+}
+
+func GetBucketVersioning(ctx context.Context, client BucketVersioning, bucketName string) string {
+	input := &s3.GetBucketVersioningInput{
+		Bucket: aws.String(bucketName),
+	}
+	ver, err := client.GetBucketVersioning(ctx, input)
 	if err != nil {
 		log.Fatalf("failed to get bucket versioning status, %v", err)
 	}
@@ -132,7 +133,10 @@ func main() {
 		if bLocation == "" {
 			bLocation = "us-east-1"
 		}
-		vStatus := getVersioning(*bucket.Name, cfg, bLocation)
+		s3Client := s3.NewFromConfig(cfg, func(o *s3.Options) {
+			o.Region = bLocation
+		})
+		vStatus := GetBucketVersioning(context.Background(), s3Client, *bucket.Name)
 		eStatus, eType := getEncryption(*bucket.Name, cfg, bLocation)
 		lStatus, lBucket := getLogging(*bucket.Name, cfg, bLocation)
 		pStatus := isPublic(*bucket.Name, cfg, bLocation)
