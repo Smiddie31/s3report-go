@@ -39,10 +39,12 @@ type s3Bucket struct {
 	polStatus  bool
 }
 
+// BucketVersioning is an interface for the AWS API Call GetBucketVersioning
 type BucketVersioning interface {
 	GetBucketVersioning(ctx context.Context, input *s3.GetBucketVersioningInput, optFns ...func(*s3.Options)) (*s3.GetBucketVersioningOutput, error)
 }
 
+// GetBucketVersioning is a function in which gathers the version of a S3 Bucket
 func GetBucketVersioning(ctx context.Context, client BucketVersioning, bucketName string) string {
 	input := &s3.GetBucketVersioningInput{
 		Bucket: aws.String(bucketName),
