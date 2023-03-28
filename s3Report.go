@@ -44,6 +44,11 @@ type BucketVersioning interface {
 	GetBucketVersioning(ctx context.Context, input *s3.GetBucketVersioningInput, optFns ...func(*s3.Options)) (*s3.GetBucketVersioningOutput, error)
 }
 
+// BucketEncryption is an interface for the AWS API Call GetBucketEncryption
+type BucketEncryption interface {
+	GetBucketEncryption(ctx context.Context, input *s3.GetBucketEncryptionInput, optFns ...func(*s3.Options)) (*s3.GetBucketEncryptionOutput, error)
+}
+
 // GetBucketVersioning is a function in which gathers the version of a S3 Bucket
 func GetBucketVersioning(ctx context.Context, client BucketVersioning, bucketName string) string {
 	input := &s3.GetBucketVersioningInput{
@@ -61,6 +66,26 @@ func GetBucketVersioning(ctx context.Context, client BucketVersioning, bucketNam
 	default:
 		return "Not Enabled"
 	}
+}
+
+// GetBucketEncryption is a function in which gathers the encryption and encryption type of a S3 Bucket
+func GetBucketEncryption(ctx context.Context, client BucketEncryption, bucketName string) (string, string) {
+	input := &s3.GetBucketEncryptionInput{
+		Bucket: aws.String(bucketName),
+	}
+	enc, err := client.GetBucketEncryption(ctx, input)
+	if err != nil {
+		return "Not Enabled", "None"
+	}
+	switch enc.ServerSideEncryptionConfiguration.Rules[0].ApplyServerSideEncryptionByDefault.SSEAlgorithm {
+	case "AES256":
+		return "Enabled", "SSE"
+	case "aws:kms":
+		return "Enabled", "KMS"
+	default:
+		return "Not Enabled", "None"
+	}
+
 }
 
 // Query the s3 bucket and returns the s3 encryption status and type.
@@ -139,7 +164,7 @@ func main() {
 			o.Region = bLocation
 		})
 		vStatus := GetBucketVersioning(context.Background(), s3Client, *bucket.Name)
-		eStatus, eType := getEncryption(*bucket.Name, cfg, bLocation)
+		eStatus, eType := GetBucketEncryption(context.Background(), s3Client, *bucket.Name)
 		lStatus, lBucket := getLogging(*bucket.Name, cfg, bLocation)
 		pStatus := isPublic(*bucket.Name, cfg, bLocation)
 		bucketData = append(bucketData, &s3Bucket{*bucket.Name, bLocation, vStatus, eStatus, eType, lStatus, lBucket, pStatus})
