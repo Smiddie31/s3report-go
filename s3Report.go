@@ -49,6 +49,11 @@ type BucketEncryption interface {
 	GetBucketEncryption(ctx context.Context, input *s3.GetBucketEncryptionInput, optFns ...func(*s3.Options)) (*s3.GetBucketEncryptionOutput, error)
 }
 
+// BucketLogging is an interface for the AWS API Call GetBucketLogging
+type BucketLogging interface {
+	GetBucketLogging(ctx context.Context, input *s3.GetBucketLoggingInput, optFns ...func(*s3.Options)) (*s3.GetBucketLoggingOutput, error)
+}
+
 // GetBucketVersioning is a function in which gathers the version of a S3 Bucket
 func GetBucketVersioning(ctx context.Context, client BucketVersioning, bucketName string) string {
 	input := &s3.GetBucketVersioningInput{
@@ -88,20 +93,19 @@ func GetBucketEncryption(ctx context.Context, client BucketEncryption, bucketNam
 
 }
 
-// Query the s3 bucket and returns the s3 logging status and logging bucket(if applicable).
-func getLogging(n string, c aws.Config, r string) (l string, b string) {
-	s3Client := s3.NewFromConfig(c, func(o *s3.Options) {
-		o.Region = r
-	})
-	resp, err := s3Client.GetBucketLogging(context.TODO(), &s3.GetBucketLoggingInput{Bucket: &n})
+// GetBucketLogging is a function in which gathers the logging of a S3 Bucket
+func GetBucketLogging(ctx context.Context, client BucketLogging, bucketName string) (string, string) {
+	input := &s3.GetBucketLoggingInput{
+		Bucket: aws.String(bucketName),
+	}
+	logr, err := client.GetBucketLogging(ctx, input)
 	if err != nil {
 		log.Fatalf("failed to get bucket logging status, %v", err)
 	}
-	if resp.LoggingEnabled != nil {
-		return "Enabled", *resp.LoggingEnabled.TargetBucket
-	} else {
-		return "Not Enabled", "None"
+	if logr.LoggingEnabled != nil {
+		return "Enabled", *logr.LoggingEnabled.TargetBucket
 	}
+	return "Not Enabled", "None"
 }
 
 // Query the s3 bucket and returns whether the bucket is public facing or not.
@@ -146,7 +150,7 @@ func main() {
 		})
 		vStatus := GetBucketVersioning(context.Background(), s3Client, *bucket.Name)
 		eStatus, eType := GetBucketEncryption(context.Background(), s3Client, *bucket.Name)
-		lStatus, lBucket := getLogging(*bucket.Name, cfg, bLocation)
+		lStatus, lBucket := GetBucketLogging(context.Background(), s3Client, *bucket.Name)
 		pStatus := isPublic(*bucket.Name, cfg, bLocation)
 		bucketData = append(bucketData, &s3Bucket{*bucket.Name, bLocation, vStatus, eStatus, eType, lStatus, lBucket, pStatus})
 	}
