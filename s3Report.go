@@ -54,6 +54,11 @@ type BucketLogging interface {
 	GetBucketLogging(ctx context.Context, input *s3.GetBucketLoggingInput, optFns ...func(*s3.Options)) (*s3.GetBucketLoggingOutput, error)
 }
 
+// BucketVisibility is an interface for the AWS API Call GetBucketPolicy
+type BucketVisibility interface {
+	GetBucketPolicyStatus(ctx context.Context, input *s3.GetBucketPolicyStatusInput, optFns ...func(*s3.Options)) (*s3.GetBucketPolicyStatusOutput, error)
+}
+
 // GetBucketVersioning is a function in which gathers the version of a S3 Bucket
 func GetBucketVersioning(ctx context.Context, client BucketVersioning, bucketName string) string {
 	input := &s3.GetBucketVersioningInput{
@@ -108,16 +113,16 @@ func GetBucketLogging(ctx context.Context, client BucketLogging, bucketName stri
 	return "Not Enabled", "None"
 }
 
-// Query the s3 bucket and returns whether the bucket is public facing or not.
-func isPublic(n string, c aws.Config, r string) (p bool) {
-	s3Client := s3.NewFromConfig(c, func(o *s3.Options) {
-		o.Region = r
-	})
-	resp, err := s3Client.GetBucketPolicyStatus(context.TODO(), &s3.GetBucketPolicyStatusInput{Bucket: &n})
+// GetBucketPolicyStatus is a function that determines whether a S3 Bucket is public or not.
+func GetBucketPolicyStatus(ctx context.Context, client BucketVisibility, bucketName string) bool {
+	input := &s3.GetBucketPolicyStatusInput{
+		Bucket: aws.String(bucketName),
+	}
+	pol, err := client.GetBucketPolicyStatus(ctx, input)
 	if err != nil {
 		return false
 	}
-	return resp.PolicyStatus.IsPublic
+	return pol.PolicyStatus.IsPublic
 }
 
 func main() {
@@ -151,7 +156,7 @@ func main() {
 		vStatus := GetBucketVersioning(context.Background(), s3Client, *bucket.Name)
 		eStatus, eType := GetBucketEncryption(context.Background(), s3Client, *bucket.Name)
 		lStatus, lBucket := GetBucketLogging(context.Background(), s3Client, *bucket.Name)
-		pStatus := isPublic(*bucket.Name, cfg, bLocation)
+		pStatus := GetBucketPolicyStatus(context.Background(), s3Client, *bucket.Name)
 		bucketData = append(bucketData, &s3Bucket{*bucket.Name, bLocation, vStatus, eStatus, eType, lStatus, lBucket, pStatus})
 	}
 	s := fmt.Sprintf("%v.csv", fName)
