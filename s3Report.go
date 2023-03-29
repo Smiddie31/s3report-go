@@ -39,6 +39,16 @@ type s3Bucket struct {
 	polStatus  bool
 }
 
+// BucketListing is an interface for the AWS API Call List Buckets
+type BucketListing interface {
+	ListBuckets(ctx context.Context, input *s3.ListBucketsInput, optFns ...func(*s3.Options)) (*s3.ListBucketsOutput, error)
+}
+
+// BucketLocation is an interface for the AWS API Call GetBucketLocation
+type BucketLocation interface {
+	GetBucketLocation(ctx context.Context, input *s3.GetBucketLocationInput, optFns ...func(*s3.Options)) (*s3.GetBucketLocationOutput, error)
+}
+
 // BucketVersioning is an interface for the AWS API Call GetBucketVersioning
 type BucketVersioning interface {
 	GetBucketVersioning(ctx context.Context, input *s3.GetBucketVersioningInput, optFns ...func(*s3.Options)) (*s3.GetBucketVersioningOutput, error)
@@ -59,15 +69,18 @@ type BucketVisibility interface {
 	GetBucketPolicyStatus(ctx context.Context, input *s3.GetBucketPolicyStatusInput, optFns ...func(*s3.Options)) (*s3.GetBucketPolicyStatusOutput, error)
 }
 
-// BucketListing is an interface for the AWS API Call List Buckets
-type BucketListing interface {
-	ListBuckets(ctx context.Context, input *s3.ListBucketsInput, optFns ...func(*s3.Options)) (*s3.ListBucketsOutput, error)
-}
-
 // ListBuckets is a function to list all S3 Buckets
 func ListBuckets(ctx context.Context, client BucketListing) (*s3.ListBucketsOutput, error) {
 	input := &s3.ListBucketsInput{}
 	return client.ListBuckets(ctx, input)
+}
+
+// GetBucketLocation is a function to return the region in which a S3 bucket exists.
+func GetBucketLocation(ctx context.Context, client BucketLocation, bucketName string) (*s3.GetBucketLocationOutput, error) {
+	input := &s3.GetBucketLocationInput{
+		Bucket: aws.String(bucketName),
+	}
+	return client.GetBucketLocation(ctx, input)
 }
 
 // GetBucketVersioning is a function in which gathers the version of a S3 Bucket
@@ -153,7 +166,7 @@ func main() {
 	}
 
 	for _, bucket := range buckets.Buckets {
-		bL, blErr := s3Client.GetBucketLocation(context.TODO(), &s3.GetBucketLocationInput{Bucket: bucket.Name})
+		bL, blErr := GetBucketLocation(context.Background(), s3Client, *bucket.Name)
 		if blErr != nil {
 			log.Fatalf("Couldn't locate bucket: %v", blErr)
 		}
