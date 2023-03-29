@@ -59,6 +59,17 @@ type BucketVisibility interface {
 	GetBucketPolicyStatus(ctx context.Context, input *s3.GetBucketPolicyStatusInput, optFns ...func(*s3.Options)) (*s3.GetBucketPolicyStatusOutput, error)
 }
 
+// BucketListing is an interface for the AWS API Call List Buckets
+type BucketListing interface {
+	ListBuckets(ctx context.Context, input *s3.ListBucketsInput, optFns ...func(*s3.Options)) (*s3.ListBucketsOutput, error)
+}
+
+// ListBuckets is a function to list all S3 Buckets
+func ListBuckets(ctx context.Context, client BucketListing) (*s3.ListBucketsOutput, error) {
+	input := &s3.ListBucketsInput{}
+	return client.ListBuckets(ctx, input)
+}
+
 // GetBucketVersioning is a function in which gathers the version of a S3 Bucket
 func GetBucketVersioning(ctx context.Context, client BucketVersioning, bucketName string) string {
 	input := &s3.GetBucketVersioningInput{
@@ -135,7 +146,7 @@ func main() {
 		log.Fatalf("failed to load configuration, %v", err)
 	}
 	s3Client := s3.NewFromConfig(cfg, func(o *s3.Options) {})
-	buckets, awsErr := s3Client.ListBuckets(context.TODO(), nil)
+	buckets, awsErr := ListBuckets(context.Background(), s3Client)
 	if awsErr != nil {
 		log.Fatalf("Couldn't list buckets: %v", err)
 		return
