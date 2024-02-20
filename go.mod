@@ -1,6 +1,6 @@
 module github.com/Smiddie31/s3report-go
 
-go 1.22.0
+go 1.22
 
 require (
 	github.com/Smiddie31/s3Tools v0.1.2
