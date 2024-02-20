@@ -4,7 +4,7 @@ go 1.22
 require (
 	github.com/Smiddie31/s3Tools v0.1.2
 	github.com/aws/aws-sdk-go-v2/config v1.27.0
-	github.com/aws/aws-sdk-go-v2/service/s3 v1.50.0
+	github.com/aws/aws-sdk-go-v2/service/s3 v1.50.1
 )
 
 require (
