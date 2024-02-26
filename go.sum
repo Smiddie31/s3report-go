@@ -1,5 +1,5 @@
-github.com/Smiddie31/s3Tools v0.1.2 h1:OBBahIWwrr1Djv551vgrRKMOSCXbH14S3enK9EOhJUU=
-github.com/Smiddie31/s3Tools v0.1.2/go.mod h1:bONvkVtE0MBbh0FIFuFPLxNo4QA7VtRsJju16uzNHHY=
+github.com/Smiddie31/s3Tools v0.2.0 h1:p2pLQEtUSZnolCX1yaO2N7H5iuCj+pTv9JgOs2Nj6zY=
+github.com/Smiddie31/s3Tools v0.2.0/go.mod h1:NqSZ9Q34F88IqAi4DVCWR2sXT2U5LNcioM+S8dDtXEg=
 github.com/aws/aws-sdk-go-v2 v1.25.0 h1:sv7+1JVJxOu/dD/sz/csHX7jFqmP001TIY7aytBWDSQ=
 github.com/aws/aws-sdk-go-v2 v1.25.0/go.mod h1:G104G1Aho5WqF+SR3mDIobTABQzpYV0WxMsKxlMggOA=
 github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.6.0 h1:2UO6/nT1lCZq1LqM67Oa4tdgP1CvL1sLSxvuD+VrOeE=
